@@ -5,11 +5,14 @@
 **a. Initial design**
 
 - Briefly describe your initial UML design.
+It has all four classses and the correct ownership
 - What classes did you include, and what responsibilities did you assign to each?
+I included owner, pet, task, and schedule. I gave them responsiblities that correspond with the class
 
 **b. Design changes**
 
 - Did your design change during implementation?
+It did not
 - If yes, describe at least one change and why you made it.
 
 ---
