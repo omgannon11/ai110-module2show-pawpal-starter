@@ -1,3 +1,5 @@
+from datetime import time as dtime
+
 import streamlit as st
 
 # --- Step 1: Establish the connection to the logic layer ---
@@ -64,11 +66,23 @@ with st.form("add_task_form", clear_on_submit=True):
         duration = st.number_input("Duration (minutes)", min_value=1, max_value=240, value=20)
     with t3:
         priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
-    category = st.selectbox("Category", ["walk", "feeding", "meds", "grooming", "enrichment", "other"])
+    c1, c2 = st.columns(2)
+    with c1:
+        category = st.selectbox(
+            "Category", ["walk", "feeding", "meds", "grooming", "enrichment", "other"]
+        )
+    with c2:
+        pref = st.time_input("Preferred time", value=dtime(8, 0))
     if st.form_submit_button("Add task"):
         target = next(p for p in owner.pets if p.name == which_pet)
         target.add_task(
-            Task(title=task_title, duration_minutes=int(duration), priority=priority, category=category)
+            Task(
+                title=task_title,
+                duration_minutes=int(duration),
+                priority=priority,
+                category=category,
+                preferred_time=pref,
+            )
         )
         st.success(f"Added '{task_title}' for {which_pet}!")
 
@@ -90,6 +104,53 @@ for pet in owner.pets:
             )
         else:
             st.caption("No tasks yet.")
+
+st.divider()
+
+# --- Phase 3 smart layer surfaced in the UI: sorting, filtering, conflicts ---
+st.subheader("Today at a Glance")
+glance = Scheduler(owner)
+
+# Conflict detection — presented as an actionable warning, not a crash.
+conflicts = glance.detect_conflicts()
+if conflicts:
+    st.warning(
+        f"⚠ {len(conflicts)} scheduling conflict(s) found — "
+        "two tasks want the same time slot:"
+    )
+    for message in conflicts:
+        st.write(f"- {message}")
+else:
+    st.success("No scheduling conflicts — every task has its own time slot. ✅")
+
+# Filtering by completion status, then sorting by time for a clean chronological view.
+show = st.radio(
+    "Show tasks",
+    ["Pending", "Completed", "All"],
+    horizontal=True,
+)
+tasks = owner.all_tasks()
+if show == "Pending":
+    tasks = glance.filter_by_status(tasks, completed=False)
+elif show == "Completed":
+    tasks = glance.filter_by_status(tasks, completed=True)
+
+ordered = glance.sort_by_time(tasks)
+if ordered:
+    st.table(
+        [
+            {
+                "Time": t.preferred_time.strftime("%H:%M") if t.preferred_time else "—",
+                "Task": t.title,
+                "Duration (min)": t.duration_minutes,
+                "Priority": t.priority,
+                "Status": "✓ done" if t.completed else "pending",
+            }
+            for t in ordered
+        ]
+    )
+else:
+    st.caption("No tasks to show for this filter.")
 
 st.divider()
 

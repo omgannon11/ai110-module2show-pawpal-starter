@@ -1,0 +1,62 @@
+classDiagram
+    class Owner {
+        +str name
+        +int available_minutes
+        +time day_start
+        +dict preferences
+        +list~Pet~ pets
+        +add_pet(pet: Pet) None
+        +all_tasks() list~Task~
+        +all_tasks_due_today(weekday: str) list~Task~
+        +remaining_time(scheduled: list~Task~) int
+        +prefers(key: str) bool
+    }
+
+    class Pet {
+        +str name
+        +str species
+        +str breed
+        +list~Task~ tasks
+        +add_task(task: Task) None
+        +remove_task(title: str) None
+        +tasks_due_today(weekday: str) list~Task~
+        +total_required_time() int
+    }
+
+    class Task {
+        +str title
+        +int duration_minutes
+        +str priority
+        +str category
+        +str recurrence
+        +time preferred_time
+        +str weekday
+        +date due_date
+        +bool completed
+        +priority_weight() int
+        +is_due(weekday: str) bool
+        +mark_complete() None
+        +next_occurrence(today: date) Task
+        +__repr__() str
+    }
+
+    class Scheduler {
+        +Owner owner
+        +list scheduled
+        +list~Task~ skipped
+        +build_plan(weekday: str) list
+        +sort_by_time(tasks: list~Task~) list~Task~
+        +filter_by_status(tasks: list~Task~, completed: bool) list~Task~
+        +filter_by_pet(pet_name: str) list~Task~
+        +mark_task_complete(task: Task, pet: Pet) Task
+        +detect_conflicts(tasks: list~Task~) list~str~
+        -_sort_tasks(tasks: list~Task~) list~Task~
+        -_fits(task: Task, used: int) bool
+        +explain() str
+    }
+
+    Owner "1" --> "*" Pet : owns
+    Pet "1" --> "*" Task : has
+    Scheduler --> Owner : uses
+    Scheduler ..> Task : schedules
+    Scheduler ..> Pet : updates on recurrence
