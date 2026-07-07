@@ -83,20 +83,37 @@ Conflict detection
 
 ## 🧪 Testing PawPal+
 
+Run the full automated test suite from the project root:
+
 ```bash
-# Run the full test suite:
-pytest
-
-# Run with coverage:
-pytest --cov
+python -m pytest
 ```
 
-Sample test output:
+**What the tests cover** (`tests/test_pawpal.py`, 10 tests):
+
+- **Core behavior** — marking a task complete flips its status; adding a task grows the pet's task list.
+- **Sorting correctness** — `sort_by_time()` returns tasks in chronological order, with untimed tasks last.
+- **Filtering** — `filter_by_status()` and `filter_by_pet()` return only matching tasks.
+- **Recurrence logic** — completing a daily task creates tomorrow's copy; a weekly task advances seven days.
+- **Conflict detection** — overlapping and exact-same-time tasks are flagged; non-overlapping tasks are not; nothing ever crashes.
+- **Edge case** — a pet with no tasks returns empty results from sorting, conflict detection, and `build_plan()`.
+
+Terminal output from a successful run:
 
 ```
-.......                                                                  [100%]
-7 passed in 0.01s
+platform darwin -- Python 3.10.9, pytest-7.1.2, pluggy-1.0.0
+rootdir: /Users/olliegannon/codePath/ai110-module2show-pawpal-starter
+plugins: anyio-4.13.0
+collected 10 items
+
+tests/test_pawpal.py ..........                                          [100%]
+
+============================== 10 passed in 0.01s ==============================
 ```
+
+**Confidence Level: ★★★★☆ (4/5)**
+
+The core scheduling algorithms — sorting, filtering, recurrence, and conflict detection — are all covered by passing tests, including the key edge cases (empty pets, exact-time clashes). I've left one star off because the greedy `build_plan()` time-budget packing and cross-day recurrence over month/year boundaries have lighter coverage and would be the next things to test.
 
 ## 📐 Smarter Scheduling
 

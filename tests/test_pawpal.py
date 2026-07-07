@@ -95,3 +95,42 @@ def test_detect_conflicts_returns_empty_when_no_overlap():
     scheduler = _scheduler_with_pet(pet)
 
     assert scheduler.detect_conflicts() == []
+
+
+def test_detect_conflicts_flags_exact_same_time():
+    """Edge case: two tasks scheduled at the exact same time are flagged."""
+    pet = Pet(name="Mochi", species="dog")
+    pet.add_task(Task("Give meds", 10, preferred_time=time(12, 0)))
+    pet.add_task(Task("Grooming", 45, preferred_time=time(12, 0)))
+    scheduler = _scheduler_with_pet(pet)
+
+    conflicts = scheduler.detect_conflicts()
+
+    assert len(conflicts) == 1
+
+
+def test_completing_weekly_task_advances_seven_days():
+    """A weekly task's next occurrence is due seven days later."""
+    pet = Pet(name="Biscuit", species="cat")
+    task = Task(
+        "Vet checkup", 30, recurrence="weekly", due_date=date(2026, 7, 7)
+    )
+    pet.add_task(task)
+    scheduler = _scheduler_with_pet(pet)
+
+    upcoming = scheduler.mark_task_complete(task, pet)
+
+    assert upcoming.due_date == date(2026, 7, 14)
+
+
+# --- Edge case: a pet (and owner) with no tasks at all ---
+
+def test_empty_pet_has_no_tasks_and_no_conflicts():
+    """A pet with no tasks produces empty results and never crashes."""
+    pet = Pet(name="Ghost", species="fish")
+    scheduler = _scheduler_with_pet(pet)
+
+    assert pet.tasks_due_today("monday") == []
+    assert scheduler.sort_by_time(pet.tasks) == []
+    assert scheduler.detect_conflicts() == []
+    assert scheduler.build_plan("monday") == []
