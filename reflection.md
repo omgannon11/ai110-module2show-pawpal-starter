@@ -27,7 +27,24 @@ It did not
 **b. Tradeoffs**
 
 - Describe one tradeoff your scheduler makes.
+
+  My conflict detector (`Scheduler.detect_conflicts`) checks whether two tasks'
+  time *windows* overlap using each task's `preferred_time` plus its
+  `duration_minutes`. However, the greedy `build_plan` itself does not honor
+  `preferred_time` — it packs tasks back-to-back starting at the owner's
+  `day_start`, ordered by priority then duration. So conflict detection reasons
+  about *requested* times while the generated plan reasons about *available*
+  time. I chose to keep these two views separate rather than making the planner
+  solve the harder constrained-placement problem.
+
 - Why is that tradeoff reasonable for this scenario?
+
+  A busy pet owner benefits most from a simple, predictable plan that never
+  crashes and clearly warns when two things they *wanted* at the same time can't
+  both happen. A full constraint solver (respecting fixed times, durations, and
+  priorities simultaneously) would be more "correct" but much harder to read,
+  test, and explain — and overkill for a handful of daily tasks. The lightweight
+  warning gives the owner the information to resolve clashes themselves.
 
 ---
 

@@ -10,8 +10,8 @@ Logic layer generated from diagrams/uml.mmd:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import time, timedelta, datetime
+from dataclasses import dataclass, field, replace
+from datetime import date, time, timedelta, datetime
 
 # Priority labels mapped to sortable weights (higher = more important).
 PRIORITY_WEIGHTS = {"low": 1, "medium": 2, "high": 3}
@@ -32,6 +32,7 @@ class Task:
     recurrence: str = DAILY  # "daily" | "weekly"
     preferred_time: time | None = None
     weekday: str | None = None  # for weekly tasks, the day it is due (e.g. "monday")
+    due_date: date | None = None  # the date this instance is due (for recurrence)
     completed: bool = False
 
     def priority_weight(self) -> int:
@@ -56,6 +57,17 @@ class Task:
     def mark_complete(self) -> None:
         """Mark this task as completed."""
         self.completed = True
+
+    def next_occurrence(self, today: date | None = None) -> "Task":
+        """Return a fresh, uncompleted copy of this task for its next due date.
+
+        Daily tasks advance by one day (today + 1 day); weekly tasks advance by
+        seven days. The interval is computed with datetime.timedelta so month
+        and year boundaries are handled correctly.
+        """
+        base = self.due_date or today or datetime.min.date()
+        step = timedelta(weeks=1) if self.recurrence == WEEKLY else timedelta(days=1)
+        return replace(self, completed=False, due_date=base + step)
 
     def __repr__(self) -> str:
         """Return a compact, human-readable one-line summary of the task."""
@@ -156,6 +168,78 @@ class Scheduler:
                 self.skipped.append(task)
 
         return self.scheduled
+
+    def sort_by_time(self, tasks: list[Task]) -> list[Task]:
+        """Return tasks ordered by their preferred_time (earliest first).
+
+        Tasks with no preferred_time are treated as latest so they sort to the
+        end rather than crashing the comparison.
+        """
+        return sorted(
+            tasks,
+            key=lambda t: t.preferred_time or time(23, 59),
+        )
+
+    def filter_by_status(self, tasks: list[Task], completed: bool) -> list[Task]:
+        """Return only the tasks whose completion status matches `completed`."""
+        return [t for t in tasks if t.completed == completed]
+
+    def filter_by_pet(self, pet_name: str) -> list[Task]:
+        """Return all tasks belonging to the pet with the given name."""
+        return [
+            task
+            for pet in self.owner.pets
+            if pet.name.lower() == pet_name.lower()
+            for task in pet.tasks
+        ]
+
+    def mark_task_complete(self, task: Task, pet: Pet) -> Task | None:
+        """Complete a task and auto-create its next occurrence if it recurs.
+
+        Marks `task` complete. If the task is daily or weekly, a fresh instance
+        is created for the next due date and appended to `pet`'s task list, then
+        returned. Returns None for one-off tasks.
+        """
+        task.mark_complete()
+        if task.recurrence in (DAILY, WEEKLY):
+            upcoming = task.next_occurrence()
+            pet.add_task(upcoming)
+            return upcoming
+        return None
+
+    def detect_conflicts(self, tasks: list[Task] | None = None) -> list[str]:
+        """Return warning messages for tasks whose requested times overlap.
+
+        A "lightweight" check: it compares every pair of tasks that have a
+        preferred_time, using start time + duration to decide if their windows
+        overlap. Two tasks for the same pet or different pets both count. It
+        never raises — it simply returns a list of human-readable warnings
+        (empty if the day is conflict-free) so callers can print them.
+        """
+        if tasks is None:
+            tasks = self.owner.all_tasks()
+
+        timed = [t for t in tasks if t.preferred_time is not None and not t.completed]
+        timed.sort(key=lambda t: t.preferred_time)
+
+        warnings: list[str] = []
+        for i in range(len(timed)):
+            task_a = timed[i]
+            end_a = (
+                datetime.combine(datetime.min, task_a.preferred_time)
+                + timedelta(minutes=task_a.duration_minutes)
+            ).time()
+            for j in range(i + 1, len(timed)):
+                task_b = timed[j]
+                if task_b.preferred_time < end_a:
+                    warnings.append(
+                        f"⚠ Conflict: '{task_a.title}' "
+                        f"({task_a.preferred_time.strftime('%H:%M')}, "
+                        f"{task_a.duration_minutes} min) overlaps "
+                        f"'{task_b.title}' "
+                        f"({task_b.preferred_time.strftime('%H:%M')})"
+                    )
+        return warnings
 
     def _sort_tasks(self, tasks: list[Task]) -> list[Task]:
         """Sort by priority (desc), then shorter duration first."""
